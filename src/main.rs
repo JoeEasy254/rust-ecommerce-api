@@ -7,6 +7,7 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
+use chrono::prelude::*;
 use models::Category;
 use models::Product;
 use serde_json::json;
@@ -34,7 +35,7 @@ async fn main() {
 
     // configure routing
     let app = Router::new()
-        .route("/products", get(list_products).post(create_products))
+        .route("/products", get(list_products).post(create_product))
         .route(
             "/product/:id",
             get(get_product).put(update_product).delete(delete_product),
@@ -58,6 +59,83 @@ async fn main() {
         .unwrap();
 }
 
+async fn list_products(State(state): State<AppState>) -> impl IntoResponse {
+    let products = state.products.lock().unwrap();
+    Json(products.clone());
+}
 
+async fn create_product(
+    State(state): State<AppState>,
+    Json(payload): Json<Product>,
+) -> impl IntoResponse {
+    let mut products = state.products.lock().unwrap();
+    let local: DateTime<Utc> = Utc::now();
+    let new_product = Product {
+        id: Uuid::new_v4(),
+        name: payload.name,
+        price: payload.price,
+        category: payload.category,
+        created_at: local,
+        quantity: payload.quantity,
+        updated_at: local,
+    };
 
- 
+    products.push(new_product.clone());
+    (StatusCode::CREATED, Json(new_product))
+}
+
+async fn get_product(State(state): State<AppState>, Path(id): Path<Uuid>) -> impl IntoResponse {
+    let products = state.products.lock().unwrap();
+
+    if let Some(product) = products.iter().find(|&product| product.id == id) {
+        Json(product.clone()).into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "product not found" })),
+        )
+            .into_response()
+    }
+}
+
+async fn update_product(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<Product>,
+) -> impl IntoResponse {
+    let mut products = state.products.lock().unwrap();
+    if let Some(product) = products.iter_mut().find(|product| product.id == id) {
+        product.name = payload.name;
+        product.quantity = payload.quantity;
+        product.price = payload.price;
+    }
+}
+
+async fn delete_product(State(state): State<AppState>, Path(id): Path<Uuid>) {
+    let mut products = state.products.lock().unwrap();
+    if let Some(pos) = products.iter().position(|product| product.id == id) {
+        products.remove(pos);
+
+        (
+            StatusCode::NO_CONTENT,
+            Json(json!({ "error": "no content was found" })),
+        )
+            .into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            Json(json!({ "error": "product was not found" })),
+        )
+            .into_response()
+    }
+}
+
+async fn get_categories() {}
+
+async fn create_category() {}
+
+async fn get_category() {}
+
+async fn update_category() {}
+
+async fn delete_category() {}

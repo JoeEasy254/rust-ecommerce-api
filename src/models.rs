@@ -13,7 +13,6 @@ pub struct Product {
     pub quantity: u32,
 }
 
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Category {
     pub id: Uuid,
